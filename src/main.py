@@ -4,6 +4,91 @@ from ortools.sat.python import cp_model
 from ortools.linear_solver import pywraplp
 from collections import Counter
 from dataclasses import dataclass
+import numpy as np
+from scipy.stats import truncnorm
+from typing import Union, Tuple, List, Optional
+
+from binomial import wilson_ci
+
+def generate_samples_until_sum(
+    mean: float,
+    std: float,
+    lower_bound: float,
+    upper_bound: float,
+    target_sum: float,
+    max_samples: int = 10000,
+    return_sum: bool = False,
+) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
+    """
+    Generate samples from a truncated normal distribution until their sum reaches
+    or exceeds a specified target sum.
+
+    Args:
+        mean: Mean of the underlying normal distribution
+        std: Standard deviation of the underlying normal distribution
+        lower_bound: Lower bound for truncation of individual samples
+        upper_bound: Upper bound for truncation of individual samples
+        target_sum: The minimum sum threshold to reach
+        max_samples: Maximum number of samples to generate (prevents infinite loops)
+        return_sum: If True, returns the final sum along with the samples
+
+    Returns:
+        If return_sum is False:
+            NumPy array containing the generated samples
+        If return_sum is True:
+            Tuple containing (samples array, final sum)
+
+    Raises:
+        ValueError: If parameter configuration makes reaching the target sum impossible
+        RuntimeError: If max_samples is reached without meeting the target sum
+    """
+    # Validate inputs
+    if std <= 0:
+        raise ValueError("Standard deviation must be positive")
+
+    if lower_bound >= upper_bound:
+        raise ValueError("Lower bound must be less than upper bound")
+
+    # Check if it's mathematically possible to reach the target sum
+    if lower_bound <= 0 and target_sum > 0:
+        # With negative values possible, we might never reach the target
+        print(
+            "Warning: Lower bound <= 0 means negative samples are possible, "
+            "which could make reaching the target sum difficult"
+        )
+
+    # Initialize
+    samples = []
+    current_sum = 0
+    count = 0
+
+    # Generate samples until reaching the target sum
+    while current_sum < target_sum and count < max_samples:
+        # Calculate standardized bounds
+        a = (lower_bound - mean) / std
+        b = (upper_bound - mean) / std
+
+        # Generate a single sample
+        new_sample = float(truncnorm.rvs(a, b, loc=mean, scale=std, size=1))
+
+        samples.append(new_sample)
+        current_sum += new_sample
+        count += 1
+
+    # Check if we hit the maximum without reaching the target
+    if count >= max_samples and current_sum < target_sum:
+        raise RuntimeError(
+            f"Failed to reach the target sum of {target_sum} after generating "
+            f"{max_samples} samples. Current sum: {current_sum:.2f}"
+        )
+
+    # Convert to numpy array
+    samples_array = np.array(samples)
+
+    if return_sum:
+        return samples_array, current_sum
+    else:
+        return samples_array
 
 
 class SolutionCollector(cp_model.CpSolverSolutionCallback):
@@ -137,9 +222,24 @@ class CSPSolver:
                 raise RuntimeError(f"Solver failed with status: {status}")
 
 
-def quantize(numbers, interval_size):
-    # Quantizing each number to the nearest multiple of interval_size
-    quantized = [num // interval_size * interval_size for num in numbers]
+def uniform_random_quantize(numbers, interval_size):
+    """
+    Randomly rounds to upper or lower interval with equal probability.
+    """
+    if interval_size == 0:
+        raise ValueError("interval_size cannot be zero")
+
+    quantized = []
+    for num in numbers:
+        lower = (num // interval_size) * interval_size
+        upper = lower + interval_size
+
+        # 50% chance of rounding up or down
+        if random.random() < 0.5:
+            quantized.append(upper)
+        else:
+            quantized.append(lower)
+
     return quantized
 
 
@@ -179,6 +279,7 @@ def find_feasible_packages(weight_values, lower, upper):
 def find_optimal_selections(weight_values, feasible_package_classes, config):
     # create lp solver with SCIP backend.
     lp_solver = pywraplp.Solver.CreateSolver("SCIP")
+    lp_solver.set_time_limit(100000)
     lp_solver.EnableOutput()
 
     # compute total number of times each weight value occurs.
@@ -219,18 +320,75 @@ def find_optimal_selections(weight_values, feasible_package_classes, config):
                 print(
                     {key: value for key, value in package_class.items() if value != 0}
                 )
+                print(sum(int(key) * value for key, value in package_class.items()))
+
+        print(f"Number of bins used: {num_bins}")
+        return num_bins
+    else:
+        print("The problem does not have an optimal solution.")
 
 
-def main() -> None:
-    # load config from file.
-    filename = "sample_data.json"
-    config = Config.from_json(filename)
 
-    weight_values = load_weights(config)
+def sample_from_num_solutions(config) -> int:
+    # constants are found from running MLE on sample data. target sum constant lets use get a shot at 19 portions.
+    samples = generate_samples_until_sum(
+        mean=119.6,
+        std=16.50,
+        lower_bound=80.0,
+        upper_bound=160.0,
+        target_sum=19 * 640 + 1.0,
+    )
+    weight_values = np.round(samples).astype(int).tolist()
+    weight_values = uniform_random_quantize(weight_values, 3)
     feasible_package_classes = find_feasible_packages(
         weight_values, config.lower_bound, config.upper_bound
     )
-    find_optimal_selections(weight_values, feasible_package_classes, config)
+    return find_optimal_selections(weight_values, feasible_package_classes, config)
+
+
+def percentage_of_value(lst, target_value=19.0):
+    """
+    Calculate what percentage of the list equals the target value.
+
+    Args:
+        lst: List of floats
+        target_value: The value to check for (default 19.0)
+
+    Returns:
+        Percentage as a float
+    """
+    if not lst:  # Handle empty list
+        return 0.0
+
+    count = sum(1 for x in lst if x == target_value)
+    percentage = (count / len(lst)) * 100
+    return percentage
+
+
+def main() -> None:
+    # Configuration file containing problem parameters
+    filename = "sample_data.json"
+    config = Config.from_json(filename)
+
+    # Number of Monte Carlo samples to generate
+    num_samples = 100
+    samples = []
+
+    # Generate samples by repeatedly solving the problem
+    for _ in range(num_samples):
+        num_solutions = sample_from_num_solutions(config)
+        samples.append(num_solutions)
+
+    # Calculate and display results
+    target_value = 19.0  # Expected number of solutions
+    matching_count = sum(1 for x in samples if x == target_value)
+
+    print(f"Number of solutions: {num_solutions}")
+    print(f"Percentage of {target_value}: {percentage_of_value(samples, target_value)}%")
+
+    # Calculate Wilson confidence interval for the proportion
+    lower, upper = wilson_ci(matching_count, num_samples, alpha=0.05)
+    print(f"Wilson 95% CI: ({lower:.3f}, {upper:.3f})")
 
 
 if __name__ == "__main__":
