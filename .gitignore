@@ -1,5 +1,6 @@
 # C++ build output
 build/
+cpp/build*/
 
 # Python
 __pycache__/

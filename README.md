@@ -33,6 +33,28 @@ poetry run python src/main.py
 
 This will execute the program and solve the bin covering problem using the data provided in `sample_data.json`.
 
+### C++ Monte Carlo evaluation
+
+The C++ implementation mirrors the Monte Carlo evaluation on the `dev` branch.
+It requires CMake, a C++17 compiler, and an OR-Tools installation that CMake can
+discover.
+
+```bash
+cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build cpp/build --parallel
+./cpp/build/bin_covering
+```
+
+The default evaluation runs 100 trials. Pass a trial count to the executable for
+a shorter smoke test, such as `./cpp/build/bin_covering 1`.
+
+Monte Carlo, optimization, and confidence-interval parameters are defined in
+`cpp/src/config.h`. The executable samples weights from the configured truncated
+normal distribution, solves each generated bin-covering problem, and reports the
+percentage matching the target along with its Wilson confidence interval.
+It also reports the average, minimum, and maximum solver time across all trials;
+weight generation is excluded from these timings.
+
 ## Configuration
 
 The project uses a JSON configuration file (`sample_data.json`) to provide the necessary input data for solving the bin packing/covering problems. The following fields should be included in the file:

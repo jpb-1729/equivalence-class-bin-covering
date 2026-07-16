@@ -2,36 +2,24 @@
 #define CONFIG_H_
 
 #include <cstdint>
-#include <fstream>
-#include <stdexcept>
-#include <string>
-#include <vector>
 
-#include <nlohmann/json.hpp>
-
-// Input parameters for the bin covering problem, loaded from a JSON file.
+// Parameters for the Monte Carlo evaluation and the optimization problem.
+// These defaults mirror origin/dev's Python Config.
 struct Config {
-  std::vector<int64_t> weights;
-  int64_t interval;
-  int64_t upper_bound;
-  int64_t lower_bound;
-  int64_t max_selections;
+  double mean = 119.6;
+  double standard_deviation = 16.50;
+  double sample_lower_bound = 80.0;
+  double sample_upper_bound = 160.0;
+  double target_portions = 19.0;
 
-  static Config FromJson(const std::string& path) {
-    std::ifstream file(path);
-    if (!file) {
-      throw std::runtime_error("Could not open config file: " + path);
-    }
+  int64_t quantization_interval = 3;
+  int64_t package_lower_bound = 640;
+  int64_t package_upper_bound = 680;
+  int64_t max_selections_per_package_class = 10;
 
-    const nlohmann::json data = nlohmann::json::parse(file);
-    return Config{
-        data.at("weights").get<std::vector<int64_t>>(),
-        data.at("interval").get<int64_t>(),
-        data.at("upper_bound").get<int64_t>(),
-        data.at("lower_bound").get<int64_t>(),
-        data.at("max_selections").get<int64_t>(),
-    };
-  }
+  double confidence_level = 0.05;
+  int64_t target_value = 19;
+  int64_t number_of_samples = 100;
 };
 
 #endif  // CONFIG_H_
