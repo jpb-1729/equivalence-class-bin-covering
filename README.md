@@ -1,63 +1,113 @@
+# Equivalence-Class Bin Covering
 
-## Introduction
+This project estimates how often a bin-covering solver reaches a target number
+of bins. Each Monte Carlo trial:
 
-This project is a personal implementation of a bin covering solver based on the formulation presented in the paper: *[On the Use of Equivalence Classes for Optimal and Sub-Optimal Bin Packing and Bin Covering](https://doi.org/10.1109/TASE.2020.3022986)* by Roselli, Hagebring, Riazi, Fabian, and Åkesson.
+1. draws item weights from a truncated normal distribution until their total
+   reaches the configured target;
+2. randomly quantizes those weights into equivalence classes;
+3. enumerates feasible package classes with OR-Tools CP-SAT;
+4. uses SCIP to maximize the number of packages without reusing items; and
+5. records whether the optimum matches the target value.
 
-## Installation
+After all trials, the program reports the matching percentage and a Wilson
+confidence interval for that proportion.
 
-To set up this project locally, follow these steps:
+The formulation is based on Roselli et al., [*On the Use of Equivalence Classes
+for Optimal and Sub-Optimal Bin Packing and Bin
+Covering*](https://doi.org/10.1109/TASE.2020.3022986).
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/jpb-1729/equivalence-class-bin-covering.git
-   cd equivalence-class-bin-covering
-   ```
+## Requirements
 
-2. **Install Poetry (if not already installed):**
-   ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
+- Python 3.12 or newer
+- [Poetry](https://python-poetry.org/docs/#installation)
 
-3. **Install project dependencies:**
-   ```bash
-   poetry install
-   ```
+Install the locked dependencies from the repository root:
 
-## Usage
+```bash
+poetry install
+```
 
-After installation, you can run the program with the following command:
+If Poetry selects the wrong Python version, point it at a Python 3.12
+interpreter first:
+
+```bash
+poetry env use /path/to/python3.12
+poetry install
+```
+
+## CLI usage
+
+Run one trial with the defaults:
 
 ```bash
 poetry run python src/main.py
 ```
 
-This will execute the program and solve the bin covering problem using the data provided in `sample_data.json`.
+Run 10 reproducible trials:
+
+```bash
+poetry run python src/main.py --trials 10 --seed 42
+```
+
+Show every available option and its current default:
+
+```bash
+poetry run python src/main.py --help
+```
+
+Common options:
+
+| Option | Meaning | Default |
+| --- | --- | ---: |
+| `--trials` | Number of independent Monte Carlo trials | `1` |
+| `--seed` | Seed for reproducible sampling and quantization | random |
+| `--quantization-interval` | Width of each weight equivalence class | `3` |
+| `--package-lower-bound` | Minimum weight accepted for one package | `640` |
+| `--package-upper-bound` | Maximum weight accepted for one package | `680` |
+| `--max-selections` | Maximum uses of one feasible package class | `10` |
+| `--target-value` | Optimal bin count considered a match | `19` |
+| `--alpha` | Significance level for the Wilson interval | `0.05` |
+
+Distribution options are also available: `--mean`, `--std`,
+`--sample-lower-bound`, `--sample-upper-bound`, and `--target-portions`.
+
+For example, this runs 100 trials with tighter package limits and a 99%
+confidence interval:
+
+```bash
+poetry run python src/main.py \
+  --trials 100 \
+  --package-lower-bound 645 \
+  --package-upper-bound 675 \
+  --alpha 0.01
+```
+
+SCIP prints detailed optimization logs, so longer runs can produce substantial
+terminal output and may take several minutes.
 
 ## Configuration
 
-The project uses a JSON configuration file (`sample_data.json`) to provide the necessary input data for solving the bin packing/covering problems. The following fields should be included in the file:
+The Monte Carlo defaults live in [`src/config.py`](src/config.py). CLI options
+override those defaults for a single run.
 
-- **weights**: A list of integer weights representing the values of items.
-- **interval**: The quantization interval used for grouping weights into equivalence classes.
-- **upper_bound**: The maximum total value allowed in each bin for bin packing.
-- **lower_bound**: The minimum total value required in each bin for bin covering.
-- **max_selections**: The maximum number of times a package class can be selected in the optimization process.
+`sample_data.json` is retained for the original fixed-dataset experiment, but
+the Monte Carlo entry point does **not** read it. Changing that file will not
+change `src/main.py` results.
 
-### Example `sample_data.json`:
+The key distinction between the two sets of bounds is:
 
-```json
-{
-    "weights": [10, 20, 30, 40, 50],
-    "interval": 1,
-    "upper_bound": 100,
-    "lower_bound": 50,
-    "max_selections": 10
-}
-```
+- sample bounds constrain each randomly generated item weight;
+- package bounds constrain the total weight placed in each solved package.
 
-### Citation:
-Roselli, S., Hagebring, F., Riazi, S., Fabian, M., Åkesson, K. (2021). On the Use of Equivalence Classes for Optimal and Sub-Optimal Bin Packing and Bin Covering. *IEEE Transactions on Automation Science and Engineering*, 18(1), 369-381. [DOI: 10.1109/TASE.2020.3022986](https://doi.org/10.1109/TASE.2020.3022986).
+## Project layout
+
+- `src/main.py` — CLI and Monte Carlo loop
+- `src/config.py` — default experiment parameters
+- `src/solver.py` — CP-SAT enumeration and SCIP optimization
+- `src/utils.py` — sampling, quantization, and statistics
+- `src/binomial.py` — Wilson confidence interval calculation
 
 ## License
 
-This project is licensed under the [Apache License 2.0](./LICENSE). Please see the `LICENSE` file for more details.
+Licensed under the [Apache License 2.0](LICENSE).

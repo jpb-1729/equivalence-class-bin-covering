@@ -9,8 +9,8 @@
     142, 123, 125, 128, 119, 125, 112, 105, 144, 119, 95, 128, 93,
     123, 95, 91, 114, 118, 102, 104
   ],
-  "interval": 2,
+  "interval": 3,
   "upper_bound": 680,
   "lower_bound": 640,
-  "max_selections": 9
+  "max_selections": 10
 }
