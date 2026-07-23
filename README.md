@@ -86,6 +86,24 @@ poetry run python src/main.py \
 SCIP prints detailed optimization logs, so longer runs can produce substantial
 terminal output and may take several minutes.
 
+## Real-world measurement demo
+
+The repository also includes a fixed dataset of real-world weight measurements.
+Run it through the current solver with:
+
+```bash
+poetry run python demo.py
+```
+
+The demo loads `sample_data.json`, deterministically rounds each measurement down
+to its configured equivalence-class boundary, enumerates every feasible package
+class, and reports the optimal number of packages. To run the same workflow on
+another dataset with the same JSON structure, pass its path explicitly:
+
+```bash
+poetry run python demo.py --data path/to/measurements.json
+```
+
 ### C++ Monte Carlo evaluation
 
 The C++ implementation mirrors the Monte Carlo evaluation on the `dev` branch.
@@ -113,9 +131,8 @@ weight generation is excluded from these timings.
 The Monte Carlo defaults live in [`src/config.py`](src/config.py). CLI options
 override those defaults for a single run.
 
-`sample_data.json` is retained for the original fixed-dataset experiment, but
-the Monte Carlo entry point does **not** read it. Changing that file will not
-change `src/main.py` results.
+`sample_data.json` drives `demo.py`, but the Monte Carlo entry point does **not**
+read it. Changing that file will not change `src/main.py` results.
 
 The key distinction between the two sets of bounds is:
 
@@ -129,6 +146,8 @@ The key distinction between the two sets of bounds is:
 - `src/solver.py` — CP-SAT enumeration and SCIP optimization
 - `src/utils.py` — sampling, quantization, and statistics
 - `src/binomial.py` — Wilson confidence interval calculation
+- `demo.py` — fixed real-world measurement workflow
+- `sample_data.json` — measured weights and demo parameters
 
 ## License
 
