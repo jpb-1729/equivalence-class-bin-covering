@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite the repository and the underlying
+  equivalence-class formulation paper.
+title: Equivalence-Class Bin Covering
+type: software
+authors:
+  - family-names: Bryan
+    given-names: John
+repository-code: https://github.com/jpb-1729/equivalence-class-bin-covering
+url: https://github.com/jpb-1729/equivalence-class-bin-covering
+license: Apache-2.0
+version: 0.1.0
+keywords:
+  - bin covering
+  - constraint programming
+  - equivalence classes
+  - integer programming
+  - Monte Carlo
+  - operations research
+preferred-citation:
+  type: article
+  title: >-
+    On the Use of Equivalence Classes for Optimal and Suboptimal Bin Packing
+    and Bin Covering
+  authors:
+    - family-names: Roselli
+      given-names: Sabino Francesco
+    - family-names: Hagebring
+      given-names: Fredrik
+    - family-names: Riazi
+      given-names: Sarmad
+    - family-names: Fabian
+      given-names: Martin
+    - family-names: Åkesson
+      given-names: Knut
+  journal: IEEE Transactions on Automation Science and Engineering
+  volume: 18
+  issue: 1
+  start: 369
+  end: 381
+  year: 2021
+  doi: 10.1109/TASE.2020.3022986

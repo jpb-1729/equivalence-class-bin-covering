@@ -1,3 +1,0 @@
-/Users/tiberius/dev26/equivalence-class-bin-covering/cpp/build/CMakeFiles/bin_covering.dir
-/Users/tiberius/dev26/equivalence-class-bin-covering/cpp/build/CMakeFiles/edit_cache.dir
-/Users/tiberius/dev26/equivalence-class-bin-covering/cpp/build/CMakeFiles/rebuild_cache.dir

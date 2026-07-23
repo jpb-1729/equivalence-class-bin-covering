@@ -1,56 +1,79 @@
 # Equivalence-Class Bin Covering
 
-This project estimates how often a bin-covering solver reaches a target number
-of bins. Each Monte Carlo trial:
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Paper DOI](https://img.shields.io/badge/DOI-10.1109%2FTASE.2020.3022986-B31B1B)](https://doi.org/10.1109/TASE.2020.3022986)
 
-1. draws item weights from a truncated normal distribution until their total
-   reaches the configured target;
-2. randomly quantizes those weights into equivalence classes;
-3. enumerates feasible package classes with OR-Tools CP-SAT;
-4. uses SCIP to maximize the number of packages without reusing items; and
-5. records whether the optimum matches the target value.
+Python and C++ experiments for solving bin-covering problems through weight
+equivalence classes. The project combines OR-Tools CP-SAT package enumeration
+with SCIP optimization, and includes both a preserved real-world problem
+instance and reproducible Monte Carlo evaluation.
 
-After all trials, the program reports the matching percentage and a Wilson
-confidence interval for that proportion.
+> **Preserved demo result:** 102 measurements become 33 equivalence classes and
+> 83,484 feasible package classes, producing a proven optimum of **19 packages**.
 
-The formulation is based on Roselli et al., [*On the Use of Equivalence Classes
-for Optimal and Sub-Optimal Bin Packing and Bin
-Covering*](https://doi.org/10.1109/TASE.2020.3022986).
+## Highlights
 
-## Requirements
+- Reproduces a fixed problem instance from real-world weight measurements.
+- Reduces combinatorial complexity by grouping weights into equivalence classes.
+- Enumerates feasible package classes with OR-Tools CP-SAT.
+- Maximizes non-overlapping package selections with SCIP.
+- Runs seeded Monte Carlo experiments from a truncated normal distribution.
+- Reports Wilson confidence intervals for the target-outcome proportion.
+- Provides matching Python and C++ Monte Carlo implementations.
 
-- Python 3.12 or newer
-- [Poetry](https://python-poetry.org/docs/#installation)
+## Quick start
 
-Install the locked dependencies from the repository root:
-
-```bash
-poetry install
-```
-
-If Poetry selects the wrong Python version, point it at a Python 3.12
-interpreter first:
+The Python implementation requires Python 3.12 or newer and
+[Poetry](https://python-poetry.org/docs/#installation).
 
 ```bash
-poetry env use /path/to/python3.12
+git clone https://github.com/jpb-1729/equivalence-class-bin-covering.git
+cd equivalence-class-bin-covering
 poetry install
+poetry run python demo.py
 ```
 
-## CLI usage
+The demo is intentionally a full optimization run and can take tens of seconds,
+depending on the machine and solver build. SCIP also prints detailed progress
+logs.
 
-Run one trial with the defaults:
+## Workflows
+
+### Fixed measurement demo
+
+`demo.py` loads `sample_data.json`, deterministically maps each measurement to
+the lower boundary of its configured equivalence class, enumerates all package
+classes within the configured weight window, and reports the optimum:
+
+```bash
+poetry run python demo.py
+```
+
+Use another dataset with the same JSON schema:
+
+```bash
+poetry run python demo.py --data path/to/measurements.json
+```
+
+See [`SAMPLE_DATA.md`](SAMPLE_DATA.md) for the schema, exact transformation,
+verified result, licensing, and currently known provenance gaps.
+
+### Python Monte Carlo evaluation
+
+Run one trial with the default configuration:
 
 ```bash
 poetry run python src/main.py
 ```
 
-Run 10 reproducible trials:
+Run ten reproducible trials:
 
 ```bash
 poetry run python src/main.py --trials 10 --seed 42
 ```
 
-Show every available option and its current default:
+Show every option:
 
 ```bash
 poetry run python src/main.py --help
@@ -61,19 +84,18 @@ Common options:
 | Option | Meaning | Default |
 | --- | --- | ---: |
 | `--trials` | Number of independent Monte Carlo trials | `1` |
-| `--seed` | Seed for reproducible sampling and quantization | random |
+| `--seed` | Seed for Python and NumPy random generators | random |
 | `--quantization-interval` | Width of each weight equivalence class | `3` |
-| `--package-lower-bound` | Minimum weight accepted for one package | `640` |
-| `--package-upper-bound` | Maximum weight accepted for one package | `680` |
+| `--package-lower-bound` | Lower package-weight enumeration bound | `640` |
+| `--package-upper-bound` | Upper package-weight enumeration bound | `680` |
 | `--max-selections` | Maximum uses of one feasible package class | `10` |
-| `--target-value` | Optimal bin count considered a match | `19` |
+| `--target-value` | Optimal package count considered a match | `19` |
 | `--alpha` | Significance level for the Wilson interval | `0.05` |
 
-Distribution options are also available: `--mean`, `--std`,
-`--sample-lower-bound`, `--sample-upper-bound`, and `--target-portions`.
+Distribution options include `--mean`, `--std`, `--sample-lower-bound`,
+`--sample-upper-bound`, and `--target-portions`.
 
-For example, this runs 100 trials with tighter package limits and a 99%
-confidence interval:
+For example:
 
 ```bash
 poetry run python src/main.py \
@@ -83,32 +105,10 @@ poetry run python src/main.py \
   --alpha 0.01
 ```
 
-SCIP prints detailed optimization logs, so longer runs can produce substantial
-terminal output and may take several minutes.
-
-## Real-world measurement demo
-
-The repository also includes a fixed dataset of real-world weight measurements.
-Run it through the current solver with:
-
-```bash
-poetry run python demo.py
-```
-
-The demo loads `sample_data.json`, deterministically rounds each measurement down
-to its configured equivalence-class boundary, enumerates every feasible package
-class, and reports the optimal number of packages. To run the same workflow on
-another dataset with the same JSON structure, pass its path explicitly:
-
-```bash
-poetry run python demo.py --data path/to/measurements.json
-```
-
 ### C++ Monte Carlo evaluation
 
-The C++ implementation mirrors the Monte Carlo evaluation on the `dev` branch.
-It requires CMake, a C++17 compiler, and an OR-Tools installation that CMake can
-discover.
+The C++17 implementation mirrors the Python Monte Carlo workflow. It requires
+CMake and an OR-Tools installation that CMake can discover.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release
@@ -116,39 +116,79 @@ cmake --build cpp/build --parallel
 ./cpp/build/bin_covering
 ```
 
-The default evaluation runs 100 trials. Pass a trial count to the executable for
-a shorter smoke test, such as `./cpp/build/bin_covering 1`.
+The default C++ evaluation runs 100 trials. Pass a trial count for a shorter
+smoke test:
 
-Monte Carlo, optimization, and confidence-interval parameters are defined in
-`cpp/src/config.h`. The executable samples weights from the configured truncated
-normal distribution, solves each generated bin-covering problem, and reports the
-percentage matching the target along with its Wilson confidence interval.
-It also reports the average, minimum, and maximum solver time across all trials;
-weight generation is excluded from these timings.
+```bash
+./cpp/build/bin_covering 1
+```
 
-## Configuration
+Parameters are defined in `cpp/src/config.h`. The program reports the target
+match percentage, Wilson confidence interval, and average, minimum, and maximum
+solver times. Sample generation is excluded from the timing measurements.
 
-The Monte Carlo defaults live in [`src/config.py`](src/config.py). CLI options
-override those defaults for a single run.
+## Method
 
-`sample_data.json` drives `demo.py`, but the Monte Carlo entry point does **not**
-read it. Changing that file will not change `src/main.py` results.
+Each Monte Carlo trial:
 
-The key distinction between the two sets of bounds is:
+1. draws weights from a truncated normal distribution until their total reaches
+   the configured target;
+2. quantizes the weights into equivalence classes;
+3. enumerates feasible package classes with OR-Tools CP-SAT;
+4. uses SCIP to maximize the number of selected packages without reusing items;
+5. records whether the optimum matches the target package count.
 
-- sample bounds constrain each randomly generated item weight;
-- package bounds constrain the total weight placed in each solved package.
+Across trials, the program reports the matching percentage and a Wilson
+confidence interval for that proportion.
+
+The formulation is based on Roselli et al.,
+[*On the Use of Equivalence Classes for Optimal and Suboptimal Bin Packing and
+Bin Covering*](https://doi.org/10.1109/TASE.2020.3022986).
+
+## Configuration and reproducibility
+
+Python Monte Carlo defaults live in [`src/config.py`](src/config.py), and CLI
+arguments override them for one run. C++ defaults live in
+[`cpp/src/config.h`](cpp/src/config.h).
+
+`sample_data.json` drives only the fixed demo. Modifying it does not affect
+`src/main.py` or the C++ Monte Carlo implementation.
+
+The two kinds of bounds have different roles:
+
+- sample bounds truncate each generated item weight;
+- package bounds define the package-total window enumerated by the solver.
+
+Use `--seed` when comparing Python Monte Carlo configurations. Solver logs and
+the exact selected package classes may vary between compatible solver versions
+when multiple optimal solutions exist.
 
 ## Project layout
 
-- `src/main.py` — CLI and Monte Carlo loop
-- `src/config.py` — default experiment parameters
-- `src/solver.py` — CP-SAT enumeration and SCIP optimization
-- `src/utils.py` — sampling, quantization, and statistics
-- `src/binomial.py` — Wilson confidence interval calculation
-- `demo.py` — fixed real-world measurement workflow
-- `sample_data.json` — measured weights and demo parameters
+```text
+.
+├── demo.py                  Fixed real-world measurement workflow
+├── sample_data.json         Preserved measurements and demo parameters
+├── SAMPLE_DATA.md           Data schema, provenance, and expected result
+├── src/
+│   ├── main.py              Python Monte Carlo CLI
+│   ├── config.py            Python experiment defaults
+│   ├── solver.py            CP-SAT enumeration and SCIP optimization
+│   ├── utils.py             Sampling, quantization, and statistics
+│   └── binomial.py          Wilson confidence interval
+└── cpp/
+    ├── CMakeLists.txt
+    └── src/                 C++ Monte Carlo implementation
+```
+
+## Citation
+
+GitHub exposes citation metadata from [`CITATION.cff`](CITATION.cff). If this
+software contributes to published work, cite both the repository and the
+underlying equivalence-class formulation paper.
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE).
+This project and its included sample are licensed under the
+[Apache License 2.0](LICENSE). Third-party dependencies retain their respective
+licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
